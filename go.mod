@@ -10,4 +10,6 @@ require (
 	golang.org/x/oauth2 v0.28.0
 )
 
+replace golang.org/x/oauth2 v0.28.0 => github.com/woutslakhorst/oauth2 v0.0.0-20250513065706-5211f452f482
+
 require golang.org/x/crypto v0.36.0 // indirect

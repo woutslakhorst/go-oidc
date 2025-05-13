@@ -94,13 +94,14 @@ func doRequest(ctx context.Context, req *http.Request) (*http.Response, error) {
 
 // Provider represents an OpenID Connect server's configuration.
 type Provider struct {
-	issuer        string
-	authURL       string
-	tokenURL      string
-	deviceAuthURL string
-	userInfoURL   string
-	jwksURL       string
-	algorithms    []string
+	issuer         string
+	authURL        string
+	tokenURL       string
+	deviceAuthURL  string
+	userInfoURL    string
+	jwksURL        string
+	algorithms     []string
+	dpopAlgorithms []string
 
 	// Raw claims returned by the server.
 	rawClaims []byte
@@ -129,13 +130,14 @@ func (p *Provider) remoteKeySet() KeySet {
 }
 
 type providerJSON struct {
-	Issuer        string   `json:"issuer"`
-	AuthURL       string   `json:"authorization_endpoint"`
-	TokenURL      string   `json:"token_endpoint"`
-	DeviceAuthURL string   `json:"device_authorization_endpoint"`
-	JWKSURL       string   `json:"jwks_uri"`
-	UserInfoURL   string   `json:"userinfo_endpoint"`
-	Algorithms    []string `json:"id_token_signing_alg_values_supported"`
+	Issuer         string   `json:"issuer"`
+	AuthURL        string   `json:"authorization_endpoint"`
+	TokenURL       string   `json:"token_endpoint"`
+	DeviceAuthURL  string   `json:"device_authorization_endpoint"`
+	JWKSURL        string   `json:"jwks_uri"`
+	UserInfoURL    string   `json:"userinfo_endpoint"`
+	Algorithms     []string `json:"id_token_signing_alg_values_supported"`
+	DPoPAlgorithms []string `json:"dpop_signing_alg_values_supported"`
 }
 
 // supportedAlgorithms is a list of algorithms explicitly supported by this
@@ -162,7 +164,7 @@ var supportedAlgorithms = map[string]bool{
 // parsing.
 //
 //	// Directly fetch the metadata document.
-// 	resp, err := http.Get("https://login.example.com/custom-metadata-path")
+//	resp, err := http.Get("https://login.example.com/custom-metadata-path")
 //	if err != nil {
 //		// ...
 //	}
@@ -206,6 +208,10 @@ type ProviderConfig struct {
 	// ID tokens. If not provided, this defaults to the algorithms advertised by
 	// the JWK endpoint, then the set of algorithms supported by this package.
 	Algorithms []string `json:"id_token_signing_alg_values_supported"`
+
+	// DPoPAlgorithms, if provided, indicate a list of JWT algorithms allowed to
+	// sign DPoP proof tokens. If not provided, DPoP is disabled.
+	DPoPAlgorithms []string `json:"dpop_signing_alg_values_supported"`
 }
 
 // NewProvider initializes a provider from a set of endpoints, rather than
@@ -215,14 +221,15 @@ type ProviderConfig struct {
 // [ClientContext], not cancelation.
 func (p *ProviderConfig) NewProvider(ctx context.Context) *Provider {
 	return &Provider{
-		issuer:        p.IssuerURL,
-		authURL:       p.AuthURL,
-		tokenURL:      p.TokenURL,
-		deviceAuthURL: p.DeviceAuthURL,
-		userInfoURL:   p.UserInfoURL,
-		jwksURL:       p.JWKSURL,
-		algorithms:    p.Algorithms,
-		client:        getClient(ctx),
+		issuer:         p.IssuerURL,
+		authURL:        p.AuthURL,
+		tokenURL:       p.TokenURL,
+		deviceAuthURL:  p.DeviceAuthURL,
+		userInfoURL:    p.UserInfoURL,
+		jwksURL:        p.JWKSURL,
+		algorithms:     p.Algorithms,
+		dpopAlgorithms: p.DPoPAlgorithms,
+		client:         getClient(ctx),
 	}
 }
 
@@ -275,16 +282,23 @@ func NewProvider(ctx context.Context, issuer string) (*Provider, error) {
 			algs = append(algs, a)
 		}
 	}
+	var dpopAlgs []string
+	for _, a := range p.DPoPAlgorithms {
+		if supportedAlgorithms[a] {
+			dpopAlgs = append(dpopAlgs, a)
+		}
+	}
 	return &Provider{
-		issuer:        issuerURL,
-		authURL:       p.AuthURL,
-		tokenURL:      p.TokenURL,
-		deviceAuthURL: p.DeviceAuthURL,
-		userInfoURL:   p.UserInfoURL,
-		jwksURL:       p.JWKSURL,
-		algorithms:    algs,
-		rawClaims:     body,
-		client:        getClient(ctx),
+		issuer:         issuerURL,
+		authURL:        p.AuthURL,
+		tokenURL:       p.TokenURL,
+		deviceAuthURL:  p.DeviceAuthURL,
+		userInfoURL:    p.UserInfoURL,
+		jwksURL:        p.JWKSURL,
+		algorithms:     algs,
+		dpopAlgorithms: dpopAlgs,
+		rawClaims:      body,
+		client:         getClient(ctx),
 	}, nil
 }
 
